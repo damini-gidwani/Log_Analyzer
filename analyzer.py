@@ -1,5 +1,5 @@
 import argparse
-
+import json
 
 def read_logs(log_file):
     try:
@@ -84,10 +84,29 @@ def build_report(counts, total_logs, logs_list, level=None, top_n=5):
 
         report += f"\nTOP {top_n} {level} LOGS\n\n"
 
-        for msg, count in top[:top_n]:
+        for msg, count in top[:min(top_n,len(logs_list))]:
             report += f"{msg} -> {count}\n"
 
-    return report            
+    return report 
+
+def build_json(counts, total_logs, logs_list, level=None, top=None):
+    data = {
+        "total_logs": total_logs,
+        "counts": counts,
+        "logs": logs_list
+    }
+
+    if level:
+        data["filtered_level"] = level
+
+    if top:
+        data["top_logs"] = top
+
+    return data
+
+def save_json(file_name, data):
+    with open(file_name, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)           
 
 def main():
     parser = argparse.ArgumentParser(description="-- Log Analyzer --")
@@ -105,20 +124,32 @@ def main():
     data = read_logs(args.log)
     top_n = args.top
     out_f = args.output
-    
+
     if data is None:
         return
 
     counts, total_logs, logs_list = analyze_logs(data)
+    
+    top = top_logs(logs_list, level) if level else None
 
     report = build_report(counts, total_logs, logs_list, level, top_n)
+    json_data = build_json(counts, total_logs, logs_list, level, top)
+    
     
     if out_f:
-        with open(out_f, "w" , encoding="utf-8") as f:
-            f.write(report)
+
+        if out_f.endswith(".json"):
+            save_json(out_f, json_data)
+
+        elif out_f.endswith(".txt"):
+            with open(out_f, "w", encoding="utf-8") as f:
+                f.write(report)
+
+        else:
+            print("❌ Error: Only .json and .txt supported")
+
     else:
         print(report)
-
 
 if __name__ == "__main__":
     main()
