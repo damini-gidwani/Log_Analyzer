@@ -64,6 +64,30 @@ def top_logs(logslist,level):
     )
     return sorted_logs
         
+def build_report(counts, total_logs, logs_list, level=None, top_n=5):
+    report = ""
+
+    report += "\n=========================\n"
+    report += "     LOG REPORT 📊\n"
+    report += "=========================\n\n"
+
+    report += f"Total Logs : {total_logs}\n\n"
+
+    report += f"INFO    : {counts['INFO']}\n"
+    report += f"WARNING : {counts['WARNING']}\n"
+    report += f"ERROR   : {counts['ERROR']}\n"
+
+    report += "\n=========================\n"
+
+    if level:
+        top = top_logs(logs_list, level)
+
+        report += f"\nTOP {top_n} {level} LOGS\n\n"
+
+        for msg, count in top[:top_n]:
+            report += f"{msg} -> {count}\n"
+
+    return report            
 
 def main():
     parser = argparse.ArgumentParser(description="-- Log Analyzer --")
@@ -75,29 +99,25 @@ def main():
     default=5,
     help="Show top N logs"
     )
+    parser.add_argument("--output",help="file in which report will appear!!!")
     args = parser.parse_args()
     level = args.level.upper() if args.level else None
     data = read_logs(args.log)
     top_n = args.top
+    out_f = args.output
     
-
     if data is None:
         return
 
     counts, total_logs, logs_list = analyze_logs(data)
 
-    print_report(counts, total_logs)
+    report = build_report(counts, total_logs, logs_list, level, top_n)
     
-    if level and level not in ["INFO", "WARNING", "ERROR"]:
-        print("Invalid level.\n Use INFO, WARNING, or ERROR")
-        return
-    
-    if level:
-        print(f"\n- TOP {top_n} {level} LOGS -\n")
-        top = top_logs(logs_list, level)
-        
-        for msg, count in top[:top_n]:
-            print(f"{msg} -> {count}")
+    if out_f:
+        with open(out_f, "w" , encoding="utf-8") as f:
+            f.write(report)
+    else:
+        print(report)
 
 
 if __name__ == "__main__":

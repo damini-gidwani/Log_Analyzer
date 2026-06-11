@@ -1,0 +1,16 @@
+
+=========================
+     LOG REPORT 📊
+=========================
+
+Total Logs : 100
+
+INFO    : 39
+WARNING : 20
+ERROR   : 41
+
+=========================
+
+TOP 1 ERROR LOGS
+
+Database connection failed -> 27
