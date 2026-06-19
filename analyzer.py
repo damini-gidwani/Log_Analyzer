@@ -230,9 +230,10 @@ def main():
     )
     parser.add_argument("--output",help="file in which report will appear!!!")
     parser.add_argument("--dir")
+    
     args = parser.parse_args()
     
-    if bool(args.log) == bool(args.dir):
+    if not args.log and not args.dir:
         parser.error("Provide either --log or --dir")
     
     top_n = args.top
