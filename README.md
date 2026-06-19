@@ -1,66 +1,111 @@
 # 📊 Log Analyzer CLI Tool
 
-A Python-based Command Line Interface (CLI) tool that analyzes log files and generates structured reports in TXT and JSON formats.  
-It helps in quickly understanding system logs by summarizing log levels and identifying frequently occurring log messages.
+A simple Python-based CLI tool to analyze log files and generate reports.  
+It can process a single log file or an entire directory of log files.
 
+---
 
 ## 🚀 Features
 
-- Read log files from a given path
-- Count log levels:
+- Analyze single `.log` file
+- Analyze multiple log files in a directory
+- Classify logs into:
   - INFO
   - WARNING
   - ERROR
-- Find top occurring log messages (based on level filter)
-- Generate human-readable **text report**
-- Export structured **JSON report**
-- CLI-based arguments using `argparse`
-- Handles file errors safely
+- Find top recurring issues
+- Export reports in:
+  - JSON format
+  - TXT format
+- Simple command-line interface (CLI)
 
-
-## 🧠 Tech Stack
-
-- Python 3
-- argparse (CLI handling)
-- json module (data serialization)
-- File handling (I/O operations)
-
+---
 
 ## 📁 Project Structure
 
-log_analyzer/
+log_analyzer_project/
 │
-├── analyzer.py        # Main script
-├── logs/
-        - Sample.log
-└── README.md
+├── log/                  # Directory for multiple log files
+│   ├── app.log
+│   ├── auth.log
+│   └── docker.log
+|
+|
+├── logs/                   # single log file storage
+│   └── sample.log
+│
+│
+├── analyzer.py           # Main Python CLI script (your code)
+│
+├── README.md             # Project documentation
 
+---
 
-## ⚙️ How It Works
+## ⚙️ Requirements
 
-1. Reads the log file
-2. Splits logs into individual lines
-3. Counts log levels (INFO, WARNING, ERROR)
-4. Finds most frequent log messages
-5. Builds:
-   - Text report OR
-   - JSON report
-6. Saves output file or prints in terminal
+- Python 3.x
 
+No external libraries required.
 
-## ▶️ Usage
+---
 
-### 🔹 Basic Run (Prints report in terminal)
-python analyzer.py --log logs/sample.log
- 
-### 🔹 Generate Text Report (.txt file)
-python analyzer.py --log logs/sample.log --output report.txt
+## ▶️ How to Run
 
-### 🔹 Generate JSON Report (.json file)
-python analyzer.py --log logs/sample.log --output report.json
+### 🔹 Analyze a single log file
 
-### 🔹 Filter logs by level + show top results
-python analyzer.py --log logs/sample.log --level error --top 5
+```bash
+python log_analyzer.py --log sample.log
+```
 
-### 🔹 Combine everything (full analysis)
-python analyzer.py --log logs/sample.log --level warning --top 3 --output report.json
+### 🔹 Analyze a directory of log files
+
+```bash
+python log_analyzer.py --dir logs/
+```
+
+---
+
+## 📤 Save Output to File
+
+### Save as TXT
+
+```bash
+python log_analyzer.py --log sample.log --output report.txt
+```
+
+### Save as JSON
+
+```bash
+python log_analyzer.py --log sample.log --output report.json
+```
+
+---
+
+## 🔢 Top Issues
+
+Control number of top issues using `--top`:
+
+```bash
+python log_analyzer.py --log sample.log --top 10
+```
+
+(Default is 5)
+
+---
+
+## 📌 CLI Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `--log` | Path to single log file |
+| `--dir` | Path to directory of log files |
+| `--top` | Number of top issues |
+| `--output` | Output file (.txt or .json) |
+
+---
+
+## ⚠️ Rules
+
+- Provide either `--log` OR `--dir`
+- Only `.txt` and `.json` output supported
+
