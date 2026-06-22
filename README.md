@@ -1,111 +1,148 @@
-# 📊 Log Analyzer CLI Tool
+# 📊 Log Analyzer (Dockerized + CLI Tool)
 
-A simple Python-based CLI tool to analyze log files and generate reports.  
-It can process a single log file or an entire directory of log files.
+A Python-based log analysis tool that scans log files from a single file or a directory, categorizes logs (INFO, WARNING, ERROR), detects top issues, and generates reports in TXT or JSON format. The project is fully containerized using Docker + Docker Compose and includes logging, exception handling, and deployment automation.
 
 ---
 
 ## 🚀 Features
 
-- Analyze single `.log` file
-- Analyze multiple log files in a directory
-- Classify logs into:
-  - INFO
-  - WARNING
-  - ERROR
-- Find top recurring issues
-- Export reports in:
-  - JSON format
-  - TXT format
-- Simple command-line interface (CLI)
+- Analyze single log file or entire directory
+- Categorize logs into INFO, WARNING, ERROR
+- Detect top recurring issues
+- Generate output reports in .txt and .json formats
+- Docker support (containerized execution)
+- Docker Compose for easy deployment
+- Logging using Python logging module
+- Strong exception handling
 
 ---
 
 ## 📁 Project Structure
 
 log_analyzer_project/
-│
-├── log/                  # Directory for multiple log files
-│   ├── app.log
-│   ├── auth.log
-│   └── docker.log
-|
-|
-├── logs/                   # single log file storage
-│   └── sample.log
-│
-│
-├── analyzer.py           # Main Python CLI script (your code)
-│
-├── README.md             # Project documentation
+├── analyzer.py
+├── generate_logs.py
+├── dockerfile
+├── docker-compose.yml
+├── deploy.sh
+├── logs/
+├── log/
+├── README.md
 
 ---
 
-## ⚙️ Requirements
+## ⚙️ Installation (Local)
 
-- Python 3.x
+git clone "https://github.com/damini-gidwani/Log_Analyzer.git"
+cd log_analyzer_project
+pip install -r requirements.txt
 
-No external libraries required.
-
----
-
-## ▶️ How to Run
-
-### 🔹 Analyze a single log file
-
-```bash
-python log_analyzer.py --log sample.log
-```
-
-### 🔹 Analyze a directory of log files
-
-```bash
-python log_analyzer.py --dir logs/
-```
+(If requirements.txt not present, no external dependencies needed)
 
 ---
 
-## 📤 Save Output to File
+## ▶️ Usage (CLI)
 
-### Save as TXT
+### Analyze single file
+python analyzer.py --log logs/sample.log
 
-```bash
-python log_analyzer.py --log sample.log --output report.txt
-```
+### Analyze directory
+python analyzer.py --dir log/
 
-### Save as JSON
+### Show top N issues
+python analyzer.py --log logs/sample.log --top 5
 
-```bash
-python log_analyzer.py --log sample.log --output report.json
-```
-
----
-
-## 🔢 Top Issues
-
-Control number of top issues using `--top`:
-
-```bash
-python log_analyzer.py --log sample.log --top 10
-```
-
-(Default is 5)
+### Save output report
+python analyzer.py --log logs/sample.log --output report.txt
+python analyzer.py --log logs/sample.log --output report.json
 
 ---
 
-## 📌 CLI Arguments
+## 🐳 Docker Usage
 
-| Argument | Description |
-|----------|-------------|
-| `--log` | Path to single log file |
-| `--dir` | Path to directory of log files |
-| `--top` | Number of top issues |
-| `--output` | Output file (.txt or .json) |
+### Build image
+docker build -t log-analyzer .
+
+### Run container
+docker run log-analyzer --log logs/sample.log
 
 ---
 
-## ⚠️ Rules
+## ⚙️ Docker Compose Usage
 
-- Provide either `--log` OR `--dir`
-- Only `.txt` and `.json` output supported
+### Build + Run
+docker compose up --build
 
+### Run in background
+docker compose up -d
+
+### Stop containers
+docker compose down
+
+---
+
+## 📜 Deployment Script
+
+chmod +x deploy.sh
+./deploy.sh
+
+---
+
+## 🧠 How It Works
+
+1. Reads log file or directory
+2. Splits logs into lines
+3. Matches keywords:
+   - ERROR → error, failed, critical, etc.
+   - WARNING → timeout, retry, etc.
+   - INFO → started, success, etc.
+4. Counts occurrences
+5. Finds top issues
+6. Generates:
+   - Console output
+   - JSON or TXT report
+
+---
+
+## 📦 Output Example
+
+=========================
+LOG REPORT 📊
+=========================
+
+Total Logs : 120
+
+INFO : 50
+WARNING : 30
+ERROR : 40
+
+TOP ISSUES
+error -> 20
+failed -> 15
+timeout -> 10
+
+---
+
+## 🐛 Error Handling
+
+- Invalid file path handled safely
+- Missing directory handled
+- Permission errors logged
+- Docker container errors handled
+
+---
+
+## 📌 Tech Stack
+
+Python 3, argparse, logging, Docker, Docker Compose, Bash
+
+---
+
+
+## 👨‍💻 Author
+
+Built for learning:
+- Logging
+- Docker
+- System design basics
+- File processing in Python
