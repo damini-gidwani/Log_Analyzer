@@ -1,0 +1,13 @@
+services:
+  log-analyzer:
+    build: .
+    container_name: log-analyzer-container
+    volumes:
+      - log-data:/app
+    working_dir: /app
+    command: ["--log","/app/logs/sample.log","--output","/app/report.json"]
+
+volumes:
+  log-data:
+
+
