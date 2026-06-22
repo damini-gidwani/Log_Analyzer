@@ -3,24 +3,49 @@ import json
 import os
 
 def log_files(direc):
-    logFiles=[]
-    for file in os.listdir(direc):
-        if(file.endswith(".log")):
-            path=os.path.join(direc,file)
-            logFiles.append(path)
-    return logFiles
+    try:
+        if not os.path.exists(direc):
+            print(f"❌ Directory not found: {direc}")
+            return []
+
+        if not os.path.isdir(direc):
+            print(f"❌ Not a directory: {direc}")
+            return []
+
+        logFiles = []
+        for file in os.listdir(direc):
+            if file.endswith(".log"):
+                path = os.path.join(direc, file)
+                logFiles.append(path)
+
+        return logFiles
+
+    except Exception as e:
+        print(f"❌ Directory error: {e}")
+        return []
 
 def read_logs(log_file):
     try:
+        if not os.path.exists(log_file):
+            print(f"❌ File not found: {log_file}")
+            return None
+
         with open(log_file, "r") as file:
             return file.read()
 
-    except FileNotFoundError:
-        print(f"Error: '{log_file}' not found.")
+    except PermissionError:
+        print(f"❌ Permission denied: {log_file}")
+        return None
+
+    except Exception as e:
+        print(f"❌ Error reading file: {e}")
         return None
 
 
-def analyze_logs(data):
+def analyze_logs(data):    
+    if not data:
+        return {"INFO": 0, "WARNING": 0, "ERROR": 0}, 0, []
+    
     logs_list = data.splitlines()
     keywords = {
     "ERROR": [
@@ -128,8 +153,15 @@ def build_json(counts, total_logs, logs_list, top=None):
     return data
 
 def save_json(file_name, data):
-    with open(file_name, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)   
+    try:
+        with open(file_name, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+
+    except PermissionError:
+        print(f"❌ Permission denied: {file_name}")
+
+    except Exception as e:
+        print(f"❌ Error saving JSON: {e}")   
 
 def build_report(counts, total_logs, top=None):
     report = ""
@@ -318,4 +350,11 @@ def main():
         print(report)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+
+    except KeyboardInterrupt:
+        print("\n❌ Process stopped by user")
+
+    except Exception as e:
+        print(f"💥 Unexpected error: {e}")
