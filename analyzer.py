@@ -1,15 +1,23 @@
 import argparse
 import json
 import os
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 def log_files(direc):
     try:
         if not os.path.exists(direc):
-            print(f"❌ Directory not found: {direc}")
+            logger.error(f"Directory not found: {direc}")
             return []
 
         if not os.path.isdir(direc):
-            print(f"❌ Not a directory: {direc}")
+            logger.error(f"Not a directory: {direc}")
             return []
 
         logFiles = []
@@ -18,27 +26,28 @@ def log_files(direc):
                 path = os.path.join(direc, file)
                 logFiles.append(path)
 
-        return logFiles
+        return logFiles     
 
     except Exception as e:
-        print(f"❌ Directory error: {e}")
+        logger.error(f"dir error : {e}")
         return []
 
 def read_logs(log_file):
+    logger.info("Reading files...")
     try:
         if not os.path.exists(log_file):
-            print(f"❌ File not found: {log_file}")
+            logger.error(f"File not found: {log_file}")
             return None
 
         with open(log_file, "r") as file:
             return file.read()
 
     except PermissionError:
-        print(f"❌ Permission denied: {log_file}")
+        logger.error(f"Permission denied: {log_file}")
         return None
 
     except Exception as e:
-        print(f"❌ Error reading file: {e}")
+        logger.error(f"❌ Error reading file: {e}")
         return None
 
 
@@ -158,10 +167,10 @@ def save_json(file_name, data):
             json.dump(data, f, indent=4)
 
     except PermissionError:
-        print(f"❌ Permission denied: {file_name}")
+        logger.error(f"❌ Permission denied: {file_name}")
 
     except Exception as e:
-        print(f"❌ Error saving JSON: {e}")   
+        logger.error(f"❌ Error saving JSON: {e}")   
 
 def build_report(counts, total_logs, top=None):
     report = ""
@@ -252,6 +261,7 @@ def build_directory_json(overall_counts, total_files, top):
     
 
 def main():
+    logger.info("Log Analyzer started")
     parser = argparse.ArgumentParser(description="-- Log Analyzer --")
     parser.add_argument("--log")
     parser.add_argument(
@@ -275,7 +285,7 @@ def main():
         result = analyze_directory(args.dir, top_n)
 
         if result == (None, None, None):
-            print("No log files found in directory")
+            logger.warning("No log files found in directory")
             return
 
         overall_counts, total_files, top = result
@@ -315,7 +325,7 @@ def main():
             elif out_f.endswith(".json"):
                 save_json(out_f, json_data)
             else:
-                print("❌ Error: Only .json and .txt supported")
+                logger.error("❌ Error: Only .json and .txt supported")
         return
     
     data = read_logs(args.log)
@@ -344,17 +354,19 @@ def main():
                 f.write(report)
 
         else:
-           print("❌ Error: Only .json and .txt supported")
+           logger.error("❌ Error: Only .json and .txt supported")
 
     else:
         print(report)
+
+    logger.info("Log Analyzer ended successfully!")
 
 if __name__ == "__main__":
     try:
         main()
 
     except KeyboardInterrupt:
-        print("\n❌ Process stopped by user")
+        logger.warning("\n❌ Process stopped by user")
 
     except Exception as e:
-        print(f"💥 Unexpected error: {e}")
+        logger.error(f"💥 Unexpected error: {e}")
