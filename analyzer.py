@@ -1,16 +1,49 @@
 import argparse
 import json
 import os
+import re
 import logging
+from typing import Optional
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
 logger = logging.getLogger(__name__)
 
-def log_files(direc):
+KEYWORDS = {
+    "ERROR": [
+        "error", "failed", "failure", "critical",
+        "panic", "fatal", "denied", "refused"
+    ],
+    "WARNING": [
+        "warning", "timeout", "deprecated", "retry"
+    ],
+    "INFO": [
+        "started", "connected", "loaded", "accepted", "success"
+    ],
+}
+
+
+ISSUE_KEYWORDS = [
+    "error", "failed", "failure", "critical", "panic",
+    "fatal", "denied", "refused", "timeout", "warning"
+]
+
+_COMPILED = {
+    level: [re.compile(rf"\b{re.escape(word)}\b") for word in words]
+    for level, words in KEYWORDS.items()
+}
+_COMPILED_ISSUES = [
+    (word, re.compile(rf"\b{re.escape(word)}\b")) for word in ISSUE_KEYWORDS
+]
+
+
+def _matches_any(patterns: list[re.Pattern], text: str) -> bool:
+    return any(p.search(text) for p in patterns)
+
+
+def log_files(direc: str) -> list[str]:
     try:
         if not os.path.exists(direc):
             logger.error(f"Directory not found: {direc}")
@@ -20,26 +53,25 @@ def log_files(direc):
             logger.error(f"Not a directory: {direc}")
             return []
 
-        logFiles = []
-        for file in os.listdir(direc):
-            if file.endswith(".log"):
-                path = os.path.join(direc, file)
-                logFiles.append(path)
-
-        return logFiles     
+        return [
+            os.path.join(direc, f)
+            for f in os.listdir(direc)
+            if f.endswith(".log")
+        ]
 
     except Exception as e:
         logger.error(f"dir error : {e}")
         return []
 
-def read_logs(log_file):
-    logger.info("Reading files...")
+
+def read_logs(log_file: str) -> Optional[str]:
+    logger.info(f"Reading {log_file} ...")
     try:
         if not os.path.exists(log_file):
             logger.error(f"File not found: {log_file}")
             return None
 
-        with open(log_file, "r") as file:
+        with open(log_file, "r", encoding="utf-8") as file:
             return file.read()
 
     except PermissionError:
@@ -51,322 +83,203 @@ def read_logs(log_file):
         return None
 
 
-def analyze_logs(data):    
+
+def analyze_logs(data: Optional[str]) -> tuple[dict[str, int], int, list[str]]:
     if not data:
         return {"INFO": 0, "WARNING": 0, "ERROR": 0}, 0, []
-    
+
     logs_list = data.splitlines()
-    keywords = {
-    "ERROR": [
-        "error",
-        "failed",
-        "failure",
-        "critical",
-        "panic",
-        "fatal",
-        "denied",
-        "refused"
-    ],
+    counts = {"ERROR": 0, "WARNING": 0, "INFO": 0}
 
-    "WARNING": [
-        "warning",
-        "timeout",
-        "deprecated",
-        "retry"
-    ],
-
-    "INFO": [
-        "started",
-        "connected",
-        "loaded",
-        "accepted",
-        "success"
-    ]
-    }
-    counts = {
-    "ERROR": 0,
-    "WARNING": 0,
-    "INFO": 0
-    }
     for log in logs_list:
         log_lower = log.lower()
 
-        if any(word in log_lower for word in keywords["ERROR"]):
+        if _matches_any(_COMPILED["ERROR"], log_lower):
             counts["ERROR"] += 1
-
-        elif any(word in log_lower for word in keywords["WARNING"]):
+        elif _matches_any(_COMPILED["WARNING"], log_lower):
             counts["WARNING"] += 1
-
-        elif any(word in log_lower for word in keywords["INFO"]):
+        elif _matches_any(_COMPILED["INFO"], log_lower):
             counts["INFO"] += 1
+
     return counts, len(logs_list), logs_list
 
 
-def print_report(counts, total_logs):
-    print("\n=========================")
-    print("     LOG REPORT 📊")
-    print("=========================\n")
-
-    print(f"Total Logs : {total_logs}\n")
-
-    print(f"INFO    : {counts['INFO']}")
-    print(f"WARNING : {counts['WARNING']}")
-    print(f"ERROR   : {counts['ERROR']}")
-
-    print("\n=========================")
-
-def top_issues(logs_list, top_n=5):
-
-    issues = {}
-
-    keywords = [
-        "error",
-        "failed",
-        "failure",
-        "critical",
-        "panic",
-        "fatal",
-        "denied",
-        "refused",
-        "timeout",
-        "warning"
-    ]
+def top_issues(logs_list: list[str], top_n: int = 5) -> list[tuple[str, int]]:
+    issues: dict[str, int] = {}
 
     for log in logs_list:
         log_lower = log.lower()
-
-        for keyword in keywords:
-            if keyword in log_lower:
+        for keyword, pattern in _COMPILED_ISSUES:
+            if pattern.search(log_lower):
                 issues[keyword] = issues.get(keyword, 0) + 1
-                break
+                break  # one keyword counted per line, avoids double-counting
 
-    sorted_issues = sorted(
-        issues.items(),
-        key=lambda item: item[1],
-        reverse=True
-    )
+    return sorted(issues.items(), key=lambda item: item[1], reverse=True)[:top_n]
 
-    return sorted_issues[:top_n]
 
-def build_json(counts, total_logs, logs_list, top=None):
+def analyze_directory(
+    directory: str, top_n: int = 5
+) -> tuple[Optional[dict], Optional[int], Optional[list]]:
+    files = log_files(directory)
+    if not files:
+        return None, None, None
 
-    data = {
-        "total_logs": total_logs,
-        "counts": counts,
-        "logs": logs_list
-    }
+    all_logs: list[str] = []
+    overall_counts = {"INFO": 0, "WARNING": 0, "ERROR": 0}
+    total_files = 0
+
+    for file in files:
+        data = read_logs(file)
+        if data is None:
+            continue
+
+        counts, _, logs_list = analyze_logs(data)
+        all_logs.extend(logs_list)
+
+        for key in overall_counts:
+            overall_counts[key] += counts[key]
+
+        total_files += 1
+
+    top = top_issues(all_logs, top_n)
+    return overall_counts, total_files, top
+
+
+def build_report(
+    counts: dict[str, int],
+    total: int,
+    top: Optional[list[tuple[str, int]]] = None,
+    *,
+    mode: str = "file",
+) -> str:
+    if mode == "dir":
+        title = " OVERALL SUMMARY"
+        total_label = "Total Files"
+    else:
+        title = "     LOG REPORT 📊"
+        total_label = "Total Logs"
+
+    lines = [
+        "\n=========================",
+        title,
+        "=========================\n",
+        f"{total_label} : {total}\n",
+        f"INFO    : {counts['INFO']}",
+        f"WARNING : {counts['WARNING']}",
+        f"ERROR   : {counts['ERROR']}",
+    ]
+
+    if top:
+        header = "\nTOP ISSUES ACROSS ALL FILES\n" if mode == "dir" else "\nTOP ISSUES\n"
+        lines.append(header)
+        lines.extend(f"{issue} -> {count}" for issue, count in top)
+    elif top is not None:
+        lines.append("\n(no recurring issues found)")
+
+    lines.append("\n=========================")
+    return "\n".join(lines)
+
+
+def build_json(
+    counts: dict[str, int],
+    total: int,
+    top: Optional[list] = None,
+    logs_list: Optional[list[str]] = None,
+    *,
+    mode: str = "file",
+) -> dict:
+    if mode == "dir":
+        data = {"total_files": total, "counts": counts}
+    else:
+        data = {"total_logs": total, "counts": counts, "logs": logs_list or []}
 
     if top:
         data["top_issues"] = top
 
     return data
 
-def save_json(file_name, data):
+
+def save_json(file_name: str, data: dict) -> None:
     try:
         with open(file_name, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
-
     except PermissionError:
         logger.error(f"❌ Permission denied: {file_name}")
-
     except Exception as e:
-        logger.error(f"❌ Error saving JSON: {e}")   
+        logger.error(f"❌ Error saving JSON: {e}")
 
-def build_report(counts, total_logs, top=None):
-    report = ""
 
-    report += "\n=========================\n"
-    report += "     LOG REPORT 📊\n"
-    report += "=========================\n\n"
+def write_output(out_f: str, report: str, json_data: dict) -> None:
+    if out_f.endswith(".json"):
+        save_json(out_f, json_data)
+    elif out_f.endswith(".txt"):
+        with open(out_f, "w", encoding="utf-8") as f:
+            f.write(report)
+    else:
+        logger.error("❌ Error: Only .json and .txt supported")
 
-    report += f"Total Logs : {total_logs}\n\n"
 
-    report += f"INFO    : {counts['INFO']}\n"
-    report += f"WARNING : {counts['WARNING']}\n"
-    report += f"ERROR   : {counts['ERROR']}\n"
-
-    if top:
-        report += "\nTOP ISSUES\n\n"
-
-        for issue, count in top:
-            report += f"{issue} -> {count}\n"
-
-    report += "\n=========================\n"
-
-    return report
-
-def analyze_directory(directory, top_n=5):
-    all_logs = []
-    files = log_files(directory)
-
-    if len(files) == 0:
-        return None, None, None
-
-    overall_counts = {
-        "INFO": 0,
-        "WARNING": 0,
-        "ERROR": 0
-    }
-
-    total_files = 0
-
-    for file in files:
-        data = read_logs(file)
-
-        if data is None:
-            continue
-
-        counts, total_logs, logs_list = analyze_logs(data)
-
-        all_logs.extend(logs_list)
-
-        overall_counts["INFO"] += counts["INFO"]
-        overall_counts["WARNING"] += counts["WARNING"]
-        overall_counts["ERROR"] += counts["ERROR"]
-
-        total_files += 1
-
-    top = top_issues(all_logs, top_n)
-
-    return overall_counts, total_files, top
-    
-def build_directory_report(overall_counts, total_files, top):
-
-    report = ""
-
-    report += "\n====================\n"
-    report += " OVERALL SUMMARY\n"
-    report += "====================\n\n"
-
-    report += f"Total Files : {total_files}\n\n"
-
-    report += f"INFO    : {overall_counts['INFO']}\n"
-    report += f"WARNING : {overall_counts['WARNING']}\n"
-    report += f"ERROR   : {overall_counts['ERROR']}\n"
-
-    report += "\nTOP ISSUES ACROSS ALL FILES\n\n"
-
-    for issue, count in top:
-        report += f"{issue} -> {count}\n"
-
-    return report
-
-def build_directory_json(overall_counts, total_files, top):
-
-    return {
-        "total_files": total_files,
-        "counts": overall_counts,
-        "top_issues": top
-    }
-    
-
-def main():
-    logger.info("Log Analyzer started")
-    parser = argparse.ArgumentParser(description="-- Log Analyzer --")
-    parser.add_argument("--log")
-    parser.add_argument(
-    "--top",
-    type=int,
-    default=5,
-    help="Show top N logs"
-    )
-    parser.add_argument("--output",help="file in which report will appear!!!")
-    parser.add_argument("--dir")
-    
-    args = parser.parse_args()
-    
-    if not args.log and not args.dir:
-        parser.error("Provide either --log or --dir")
-    
-    top_n = args.top
-    out_f = args.output
-    
-    if args.dir:
-        result = analyze_directory(args.dir, top_n)
-
-        if result == (None, None, None):
-            logger.warning("No log files found in directory")
-            return
-
-        overall_counts, total_files, top = result
-        
-        print("\n====================")
-        print(" OVERALL SUMMARY")
-        print("====================\n")
-
-        print(f"Total Files : {total_files}\n")
-
-        print(f"INFO    : {overall_counts['INFO']}")
-        print(f"WARNING : {overall_counts['WARNING']}")
-        print(f"ERROR   : {overall_counts['ERROR']}")
-
-        print("\nTOP ISSUES ACROSS ALL FILES\n")
-
-        for issue, count in top:
-            print(f"{issue} -> {count}")
-
-        if out_f:
-
-            report = build_directory_report(
-                overall_counts,
-                total_files,
-                top
-            )
-
-            json_data = build_directory_json(
-                overall_counts,
-                total_files,
-                top
-            )
-
-            if out_f.endswith(".txt"):
-                with open(out_f, "w") as f:
-                    f.write(report)        
-            elif out_f.endswith(".json"):
-                save_json(out_f, json_data)
-            else:
-                logger.error("❌ Error: Only .json and .txt supported")
-        return
-    
-    data = read_logs(args.log)
-    
+def run_file_mode(log_path: str, top_n: int, out_f: Optional[str]) -> None:
+    data = read_logs(log_path)
     if data is None:
         return
 
     counts, total_logs, logs_list = analyze_logs(data)
-    
-    top = top_issues(logs_list,top_n)
-    
-    print("\nTOP ISSUES:")
-    for issue, count in top:
-       print(f"{issue} -> {count}")
+    top = top_issues(logs_list, top_n)
 
-    report = build_report(counts, total_logs, top)
-    json_data = build_json(counts, total_logs, logs_list, top)
-    
+    report = build_report(counts, total_logs, top, mode="file")
+    json_data = build_json(counts, total_logs, top, logs_list, mode="file")
+
     if out_f:
-
-        if out_f.endswith(".json"):
-            save_json(out_f, json_data)
-
-        elif out_f.endswith(".txt"):
-            with open(out_f, "w", encoding="utf-8") as f:
-                f.write(report)
-
-        else:
-           logger.error("❌ Error: Only .json and .txt supported")
-
+        write_output(out_f, report, json_data)
     else:
         print(report)
 
+
+def run_dir_mode(directory: str, top_n: int, out_f: Optional[str]) -> None:
+    overall_counts, total_files, top = analyze_directory(directory, top_n)
+
+    if overall_counts is None:
+        logger.warning("No log files found in directory")
+        return
+
+    report = build_report(overall_counts, total_files, top, mode="dir")
+    json_data = build_json(overall_counts, total_files, top, mode="dir")
+
+    if out_f:
+        write_output(out_f, report, json_data)
+    else:
+        print(report)
+
+
+def main() -> None:
+    logger.info("Log Analyzer started")
+    parser = argparse.ArgumentParser(description="-- Log Analyzer --")
+    parser.add_argument("--log", help="path to a single .log file")
+    parser.add_argument("--dir", help="path to a directory of .log files")
+    parser.add_argument("--top", type=int, default=5, help="show top N issues")
+    parser.add_argument("--output", help="save report to a .txt or .json file")
+
+    args = parser.parse_args()
+
+    if not args.log and not args.dir:
+        parser.error("Provide either --log or --dir")
+
+    if args.log and args.dir:
+        parser.error("Provide only one of --log or --dir, not both")
+
+    if args.dir:
+        run_dir_mode(args.dir, args.top, args.output)
+    else:
+        run_file_mode(args.log, args.top, args.output)
+
     logger.info("Log Analyzer ended successfully!")
+
 
 if __name__ == "__main__":
     try:
         main()
-
     except KeyboardInterrupt:
         logger.warning("\n❌ Process stopped by user")
-
     except Exception as e:
         logger.error(f"💥 Unexpected error: {e}")
